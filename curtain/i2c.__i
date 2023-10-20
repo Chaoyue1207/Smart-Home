@@ -1,0 +1,1 @@
+"system\iic\i2c.c" LARGE OPTIMIZE (8,SPEED) BROWSE INCDIR(.\hardware\motor;.\system\delay;.\hardware\temperature;.\hardware\lumination;.\hardware\usart;.\hardware\display_lcd12864;.\hardware\display_lcd1602;.\system\control;.\system\iic;.\system\timer;.\hardware\clock) DEBUG OBJECTEXTEND PRINT(.\i2c.lst) TABS (2) OBJECT(i2c.obj)

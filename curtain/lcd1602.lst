@@ -1,0 +1,149 @@
+C51 COMPILER V9.60.0.0   LCD1602                                                           04/17/2022 15:44:50 PAGE 1   
+
+
+C51 COMPILER V9.60.0.0, COMPILATION OF MODULE LCD1602
+OBJECT MODULE PLACED IN lcd1602.obj
+COMPILER INVOKED BY: D:\Keil_v5\C51\BIN\C51.EXE hardware\display_lcd1602\lcd1602.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR
+                    -(.\hardware\motor;.\system\delay;.\hardware\temperature;.\hardware\lumination;.\hardware\usart;.\hardware\display_lcd128
+                    -64;.\hardware\display_lcd1602;.\system\control;.\system\iic;.\system\timer;.\hardware\clock) DEBUG OBJECTEXTEND PRINT(.\
+                    -lcd1602.lst) TABS(2) OBJECT(lcd1602.obj)
+
+line level    source
+
+   1          //#include"lcd1602.h"
+   2          #include "main.h"
+   3          
+   4          //---------------------------------------------
+   5          void lcd_delay(uchar ms) /*LCD1602 延时*/
+   6          {
+   7   1          uchar j;
+   8   1          while(ms--){
+   9   2              for(j=0;j<250;j++)
+  10   2                  {;}
+  11   2              }   
+  12   1      }
+  13          
+  14          void lcd_busy_wait() /*LCD1602 忙等待*/
+  15          {
+  16   1          lcd_rs_port = 0;
+  17   1          lcd_rw_port = 1;
+  18   1          lcd_en_port = 1;
+  19   1          lcd_data_port = 0xff;
+  20   1          while (lcd_data_port&0x80);
+  21   1          lcd_en_port = 0; 
+  22   1      
+  23   1      }
+  24          
+  25          
+  26          void lcd_command_write(uchar command) /*LCD1602 命令字写入*/
+  27          {
+  28   1          lcd_busy_wait();
+  29   1          lcd_rs_port = 0;
+  30   1          lcd_rw_port = 0;
+  31   1          lcd_en_port = 0;
+  32   1          lcd_data_port = command;
+  33   1          lcd_en_port = 1;
+  34   1          lcd_en_port = 0;     
+  35   1      }
+  36          
+  37          
+  38          
+  39          void lcd_system_reset() /*LCD1602 初始化*/
+  40          {
+  41   1          lcd_delay(20);
+  42   1          lcd_command_write(0x38);
+  43   1          lcd_delay(100);
+  44   1          lcd_command_write(0x38);
+  45   1          lcd_delay(50);
+  46   1          lcd_command_write(0x38);
+  47   1          lcd_delay(10);
+  48   1          lcd_command_write(0x08);
+  49   1          lcd_command_write(0x01);
+  50   1          lcd_command_write(0x06);
+  51   1          lcd_command_write(0x0c); 
+  52   1        lcd_data_port = 0xff; /*释放数据端口*/
+C51 COMPILER V9.60.0.0   LCD1602                                                           04/17/2022 15:44:50 PAGE 2   
+
+  53   1      }
+  54          
+  55          void lcd_char_write(uchar x_pos,y_pos,lcd_dat) /*LCD1602 字符写入*/
+  56          {
+  57   1          x_pos &= 0x0f; /* X位置范围 0~15 */
+  58   1          y_pos &= 0x01; /* Y位置范围 0~ 1 */
+  59   1          if(y_pos==1) x_pos += 0x40;
+  60   1          x_pos += 0x80;
+  61   1          lcd_command_write(x_pos);
+  62   1          lcd_busy_wait();
+  63   1          lcd_rs_port = 1;
+  64   1          lcd_rw_port = 0;
+  65   1          lcd_en_port = 0;
+  66   1          lcd_data_port = lcd_dat;
+  67   1          lcd_en_port = 1;
+  68   1          lcd_en_port = 0; 
+  69   1        lcd_data_port = 0xff; /*释放数据端口*/
+  70   1      }
+  71          
+  72          
+  73          
+  74          //void main()
+  75          //{
+  76          //  uchar i;
+  77          //  uint temp; //温度值
+  78          //  lcd_system_reset(); /*LCD1602 初始化*/
+  79          //  /////////////////////////////////////////////////////////////////
+  80          //  P0=0X00;//关掉数码管的信号。阻止数码管受到P0口信号的影响。
+  81          //  dula=1;
+  82          //  wela=0;
+  83          //  delay1();
+  84          //  dula=0;
+  85          //  wela=0;
+  86          //  delay1();
+  87          //    ////////////////////////////////////////////////////////////////
+  88          //  lcd_data_port = 0xff; /*释放P0端口*/
+  89          //  Set1302(time_data_buff);  /*设置时间*/
+  90          //  while(1){
+  91          //    Get1302(time_data_buff); /*读取当前时间*/
+  92          //    temp =  ReadTemperature(); /*读取当前温度值*/
+  93          //    /*刷新显示*/
+  94          //    lcd1602_line1[3]  = mun_to_char[time_data_buff[6]/0x10];
+  95          //    lcd1602_line1[4]  = mun_to_char[time_data_buff[6]%0x10];  /*年*/
+  96          //    lcd1602_line1[6]  = mun_to_char[time_data_buff[4]/0x10];
+  97          //    lcd1602_line1[7]  = mun_to_char[time_data_buff[4]%0x10];  /*月*/
+  98          //    lcd1602_line1[9]  = mun_to_char[time_data_buff[3]/0x10];
+  99          //    lcd1602_line1[10] = mun_to_char[time_data_buff[3]%0x10];  /*日*/
+ 100          //    for(i=0;i<3;i++) lcd1602_line1[i+12]=Weeks[time_data_buff[5]&0x07][i]; /*星期*/
+ 101          //    lcd1602_line2[2]  = mun_to_char[time_data_buff[2]/0x10];
+ 102          //      lcd1602_line2[3]  = mun_to_char[time_data_buff[2]%0x10]; /*时*/
+ 103          //    lcd1602_line2[5]  = mun_to_char[time_data_buff[1]/0x10];
+ 104          //    lcd1602_line2[6]  = mun_to_char[time_data_buff[1]%0x10]; /*分*/
+ 105          //    lcd1602_line2[8]  = mun_to_char[time_data_buff[0]/0x10];
+ 106          //    lcd1602_line2[9]  = mun_to_char[time_data_buff[0]%0x10]; /*秒*/
+ 107          //        //------
+ 108          //    lcd1602_line2[12] = mun_to_char[temp/100];
+ 109          //    lcd1602_line2[13] = mun_to_char[temp%100/10];
+ 110          //    lcd1602_line2[15] = mun_to_char[temp%10];  /*温度*/
+ 111          //    //------
+ 112          //    for(i=0;i<16;i++) lcd_char_write(i,0,lcd1602_line1[i]);
+ 113          //      for(i=0;i<16;i++) lcd_char_write(i,1,lcd1602_line2[i]);
+ 114          //    }
+C51 COMPILER V9.60.0.0   LCD1602                                                           04/17/2022 15:44:50 PAGE 3   
+
+ 115          //}
+ 116          
+ 117          
+ 118          
+ 119          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    153    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

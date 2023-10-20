@@ -1,0 +1,14 @@
+"STARTUP.obj",
+"motordriver.obj",
+"DS1302.obj",
+"lcd1602.obj",
+"lumination.obj",
+"i2c.obj",
+"delay.obj",
+"main.obj",
+"18b20.obj",
+"bt.obj",
+"lcd12864.obj",
+"Tim0.obj" 
+TO "Curtain" 
+RAMSIZE(256) 

@@ -1,0 +1,467 @@
+C51 COMPILER V9.60.0.0   MAIN                                                              04/17/2022 15:44:47 PAGE 1   
+
+
+C51 COMPILER V9.60.0.0, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN main.OBJ
+COMPILER INVOKED BY: D:\Keil_v5\C51\BIN\C51.EXE main.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(.\hardware\motor;.\system\d
+                    -elay;.\hardware\temperature;.\hardware\lumination;.\hardware\usart;.\hardware\display_lcd12864;.\hardware\display_lcd160
+                    -2;.\system\control;.\system\iic;.\system\timer;.\hardware\clock) DEBUG OBJECTEXTEND TABS(2)
+
+line level    source
+
+   1          /**************************************************************
+   2          *该C文件中包含了main函数和所有的控制逻辑，详细说明这里不赘叙
+   3          *
+   4          *开发板连接方法：
+   5          *     LCD12864连接开发板右上角最长的排针
+   6          *     步进电机模块的ABCD四个排针用杜邦线接到IO口P1.3~P1.6（顺序随意）
+   7          *     HC05的GND，VCC接到开发板的对应口，RxD端接到P3.1，TxD端接到P3.0(P3.1,P3.0的第二功能分别为TxD和RxD)
+   8          *         注意：若出现电量不够的情况，则可以部分模块的电源移到另外的电源上
+   9          *
+  10          *使用方法：
+  11          *     手机下载蓝牙串口助手，成功连接上后，可以从手机上发送“m”，“k”，“b”，“s”，“t”，“o”，“q”
+  12          *     你可以在终端模式、聊天模式中输入以上字符，也可以在按键模式自定义，具体功能不再赘叙
+  13          *
+  14          *实现现象：
+  15          *     用步进电机模拟的功能完善，断电有记忆的智能窗帘系统
+  16          *
+  17          *@contributor： lc，myc
+  18          *                        2020-09-15
+  19          **************************************************************/
+  20          
+  21          
+  22          
+  23          //所有的头文件（自定义+库文件）都包含在main.h中
+  24          #include "main.h"
+  25          
+  26          //初始化lcd12864各行
+  27          uchar data lcd_line1[]={" 2000/00/00 000 "};
+  28          uchar data lcd_line2[]={"  00:00:00 00.0C"};
+  29          uchar data lcd_line3[]={"光强:0-255 L:000"};
+  30          uchar data lcd_line4[]={"模式:0 100状态:1"};
+  31          uchar code Weeks[][3]={{"SUN"},{"MON"},{"TUE"},{"WED"},{"THU"},{"FRI"},{"SAT"},{"SUN"}};
+  32          uchar code mun_to_char[] = {"0123456789ABCDEF"}; /*定义数字跟ASCII码的关系*/
+  33          
+  34          
+  35          unsigned char time_buf2[16]={2,0,2,1,0,9,0,8,1,2,5,5,0,0,0,6}; //初始化时间
+  36          
+  37          //-------以下标志位，参与了复杂的控制逻辑--------------
+  38          uint SetFlag=0;        //更新时间标志位
+  39          uint  SetTime=0;       //设置时间标志位
+  40          uint  ShowP=0;         //显示参数标志位
+  41          uint  rospeed=600;     //电机步长控制位
+  42          uchar  percentage=0;  //窗帘开关度 0代表全打开，100代表全关闭
+  43          uint  grad=0;   // 标志位  0中间量  1全关 2全开
+  44          uint MotorFlag =0; //动作命令
+  45          uint MotorState=1; //窗帘状态
+  46          uchar i=0;
+  47          uchar j=0;
+  48          uint  x=11;
+  49          unsigned int q =0;
+  50          uint temp=0; //温度值
+  51          uint temp1=0;//光强
+  52          uint timeH=0; //小时
+  53          uint MODE=1; //mode：0； 自动模式  1；手动以及蓝牙模式 
+C51 COMPILER V9.60.0.0   MAIN                                                              04/17/2022 15:44:47 PAGE 2   
+
+  54          
+  55          //---------定义快速方便的查找表--------------
+  56          uchar code check[10][10]={0,1,2,3,4,5,6,7,8,9,
+  57                                  10,11,12,13,14,15,16,17,18,19,
+  58                                  20,21,22,23,24,25,26,27,28,29,
+  59                                  30,31,32,33,34,35,36,37,38,39,
+  60                                  40,41,42,43,44,45,46,47,48,49,
+  61                                  50,51,52,53,54,55,56,57,58,59,
+  62                                  60,61,62,63,64,65,66,67,68,69,
+  63                                  70,71,72,73,74,75,76,77,78,79,
+  64                                  80,81,82,83,84,85,86,87,88,89,
+  65                                  90,91,92,93,94,95,96,97,98,99};
+  66          
+  67                                  
+  68          /****************************************************************************
+  69          *函数名：main
+  70          *功  能：1）系统初始化
+  71          *       2）进入循环：读取时间、温度、光强并显示；校准时间；按控制逻辑驱动步进电机
+  72          *输  入：无
+  73          *输  出：无 
+  74          ****************************************************************************/
+  75          void main(void){
+  76   1          sys_init();
+  77   1          while(1){
+  78   2          Ds1302_Read_Time();
+  79   2          temp=ReadTemperature();
+  80   2          temp1=255-ReadADC(1);//值取差值，用于显示光强越小，数值越小
+  81   2        
+  82   2      //--------------
+  83   2          RST= 1;  //  display前必须加
+  84   2          P1=0x87;
+  85   2          display();
+  86   2      //--------------
+  87   2        
+  88   2          setTime1();
+  89   2      
+  90   2          motor_control();
+  91   2          At24c02Write(1,percentage);
+  92   2       }
+  93   1      }
+  94          
+  95          
+  96          /****************************************************************************
+  97          *函数名：setTime1
+  98          *功  能：见具体注释
+  99          *输  入：无
+ 100          *输  出：无 
+ 101          ****************************************************************************/
+ 102          void setTime1(){
+ 103   1        
+ 104   1        if(SetFlag)     //如果接收到串口信息则更新时钟
+ 105   1        {
+ 106   2        for(j=0;j<8;j++)
+ 107   2          {
+ 108   3            time_buf1[j]=check[time_buf2[2*j]-'0'][time_buf2[2*j+1]-'0'];
+ 109   3            }
+ 110   2          Ds1302_Write_Time();//接收更新的时间然后写入ds1302
+ 111   2          SetFlag=0;          //时钟信息更新后标志位清零
+ 112   2          }
+ 113   1      }
+ 114          
+ 115          
+C51 COMPILER V9.60.0.0   MAIN                                                              04/17/2022 15:44:47 PAGE 3   
+
+ 116          /****************************************************************************
+ 117          *函数名：motor_control
+ 118          *功  能：执行控制逻辑
+ 119          *逻  辑：1）检测窗帘初始开关度，检测标志位并初始化
+ 120          *        2）检测手动模式或者自动模式，根据环境或者指令驱动电机进行相应操作
+ 121          *        3）电机停止后，检测当前状态并录入标志位
+ 122          *输  入：无
+ 123          *输  出：无 
+ 124          ****************************************************************************/
+ 125          void motor_control()
+ 126          {
+ 127   1        if(grad==1)
+ 128   1          {
+ 129   2            //让窗帘全关
+ 130   2            rospeed=(100-percentage)*6;
+ 131   2            Motor_B(rospeed);
+ 132   2            percentage=100;
+ 133   2            MotorState=0;
+ 134   2            grad=0;
+ 135   2            rospeed=600;
+ 136   2          }
+ 137   1          if(grad==2)
+ 138   1          {
+ 139   2            //让窗帘全开
+ 140   2            rospeed=percentage*6;
+ 141   2            Motor_F(rospeed);
+ 142   2            percentage=0;
+ 143   2            MotorState=1;
+ 144   2            grad=0;
+ 145   2            rospeed=600;
+ 146   2          }
+ 147   1        //--窗帘全开全闭状态检测
+ 148   1        if(percentage>=100)
+ 149   1        {
+ 150   2          MotorState=0;
+ 151   2        }
+ 152   1        if(percentage==0)
+ 153   1        {
+ 154   2          MotorState=1;
+ 155   2        }
+ 156   1        if(percentage>0&&percentage<100){
+ 157   2          MotorState=2;
+ 158   2        }
+ 159   1        
+ 160   1        
+ 161   1        if(MODE==1)//自动控制模式
+ 162   1        {
+ 163   2          timeH=(time_buf[4]/0x10)*10+(time_buf[4]%0x10);
+ 164   2          if((timeH>=0&&timeH<6)||(timeH<=23&&timeH>20)||(timeH<=16&&timeH>=12))  //21-6点  13-16点
+ 165   2            {       
+ 166   3            if(temp1>189||temp>300)
+ 167   3            {
+ 168   4              if(MotorState==1) //如果是打开状态，关上
+ 169   4              {
+ 170   5                  grad=1;
+ 171   5              
+ 172   5              }
+ 173   4            }
+ 174   3           }
+ 175   2          else
+ 176   2            {
+ 177   3              if(temp1<170&&temp<300)
+C51 COMPILER V9.60.0.0   MAIN                                                              04/17/2022 15:44:47 PAGE 4   
+
+ 178   3            {
+ 179   4              if(MotorState==0) //如果是关上状态，打开
+ 180   4              {
+ 181   5                 grad=2;          
+ 182   5              }
+ 183   4            }
+ 184   3          
+ 185   3          }
+ 186   2        }
+ 187   1        else  // 手动按键或蓝牙
+ 188   1        {
+ 189   2          if(MotorFlag==2)
+ 190   2          {
+ 191   3            MotorFlag=0;
+ 192   3            if(MotorState==1||MotorState==2) //如果是打开状态，关上
+ 193   3              {
+ 194   4                percentage=Motor_B(rospeed)+percentage;
+ 195   4                if(percentage>=100)
+ 196   4                {
+ 197   5                percentage=100;
+ 198   5                MotorState=0;
+ 199   5                }
+ 200   4                rospeed=600;
+ 201   4              }
+ 202   3          }
+ 203   2        if(MotorFlag==1)
+ 204   2          {
+ 205   3            MotorFlag=0;
+ 206   3            if(MotorState==0||MotorState==2) //如果是关闭状态，打开
+ 207   3              {
+ 208   4                percentage=percentage-Motor_F(rospeed);
+ 209   4                if(percentage<=0)
+ 210   4                {
+ 211   5                percentage=0;
+ 212   5                MotorState=1;
+ 213   5                }
+ 214   4                rospeed=600;
+ 215   4              }
+ 216   3          }
+ 217   2        }
+ 218   1        
+ 219   1        //--窗帘全开全闭状态检测
+ 220   1        if(percentage>=100)
+ 221   1        {
+ 222   2          MotorState=0;
+ 223   2        }
+ 224   1        if(percentage==0)
+ 225   1        {
+ 226   2          MotorState=1;
+ 227   2        }
+ 228   1        if(percentage>0&&percentage<100){
+ 229   2          MotorState=2;
+ 230   2        }
+ 231   1      }
+ 232          
+ 233          /***********************************************************
+ 234          *函数名：sys_init
+ 235          *功  能：初始化系统
+ 236          *输  入：无
+ 237          *输  出：无 
+ 238          ***********************************************************/
+ 239          void sys_init()
+C51 COMPILER V9.60.0.0   MAIN                                                              04/17/2022 15:44:47 PAGE 5   
+
+ 240          {
+ 241   1         lcd_init();    /*LCD12864 初始化*/ 
+ 242   1         Ds1302_Init();
+ 243   1         Ds1302_Write_Time();//time_buf1[8]
+ 244   1         UartInit();
+ 245   1        MODE=0; //初始化mode 
+ 246   1        MotorFlag=0;  
+ 247   1        MotorState=1; //0： 拉上状态   1：打开状态
+ 248   1        lcd_data_port = 0xff; /*释放P0端口*/  
+ 249   1        percentage=At24c02Read(1);
+ 250   1        if(percentage>100)
+ 251   1          percentage=100;
+ 252   1      }
+ 253          
+ 254          
+ 255          /***********************************************************
+ 256          *函数名：display
+ 257          *功  能：LCD16824显示函数
+ 258          *输  入：无
+ 259          *输  出：无 
+ 260          ***********************************************************/
+ 261          void display(void)
+ 262          {
+ 263   1        /*刷新显示*/
+ 264   1          //---时间---
+ 265   1          lcd_line1[3]  = mun_to_char[time_buf[1]/0x10];
+ 266   1          lcd_line1[4]  = mun_to_char[time_buf[1]%0x10];  /*年*/
+ 267   1          lcd_line1[6]  = mun_to_char[time_buf[2]/0x10];
+ 268   1          lcd_line1[7]  = mun_to_char[time_buf[2]%0x10];  /*月*/
+ 269   1          lcd_line1[9]  = mun_to_char[time_buf[3]/0x10];
+ 270   1          lcd_line1[10] = mun_to_char[time_buf[3]%0x10];  /*日*/
+ 271   1          for(i=0;i<3;i++) lcd_line1[i+12]=Weeks[time_buf[7]][i]; /*星期*/
+ 272   1          lcd_line2[2]  = mun_to_char[time_buf[4]/0x10];
+ 273   1          lcd_line2[3]  = mun_to_char[time_buf[4]%0x10]; /*时*/
+ 274   1          lcd_line2[5]  = mun_to_char[time_buf[5]/0x10];
+ 275   1          lcd_line2[6]  = mun_to_char[time_buf[5]%0x10]; /*分*/
+ 276   1          lcd_line2[8]  = mun_to_char[time_buf[6]/0x10];
+ 277   1          lcd_line2[9]  = mun_to_char[time_buf[6]%0x10]; /*秒*/
+ 278   1           //--温度--
+ 279   1          lcd_line2[11] = mun_to_char[temp/100];
+ 280   1          lcd_line2[12] = mun_to_char[temp%100/10];
+ 281   1          lcd_line2[14] = mun_to_char[temp%10];  /*温度*/
+ 282   1          //------
+ 283   1          //--光强--
+ 284   1          lcd_line3[13] = mun_to_char[temp1/100];
+ 285   1          lcd_line3[14] = mun_to_char[temp1%100/10];
+ 286   1          lcd_line3[15] = mun_to_char[(temp1%100)%10];  /*光强*/
+ 287   1          //------
+ 288   1          //--模式--
+ 289   1          lcd_line4[5] = mun_to_char[MODE];
+ 290   1          //
+ 291   1          lcd_line4[7] = mun_to_char[percentage/100];
+ 292   1          lcd_line4[8] = mun_to_char[percentage%100/10];
+ 293   1          lcd_line4[9] = mun_to_char[(percentage%100)%10];
+ 294   1          //窗帘状态
+ 295   1          lcd_line4[15] = mun_to_char[MotorState];
+ 296   1          //------
+ 297   1      //    /*l602显示*/
+ 298   1      //    for(i=0;i<16;i++) lcd_char_write(i,0,lcd_line1[i]);
+ 299   1      //      for(i=0;i<16;i++) lcd_char_write(i,1,lcd_line2[i]);
+ 300   1      
+ 301   1          /*l2864显示*/
+C51 COMPILER V9.60.0.0   MAIN                                                              04/17/2022 15:44:47 PAGE 6   
+
+ 302   1          lcd_pos(0,0);
+ 303   1          for(i=0;i<16;i++) lcd_wdat(lcd_line1[i]);
+ 304   1          lcd_pos(1,0);
+ 305   1            for(i=0;i<16;i++) lcd_wdat(lcd_line2[i]);
+ 306   1          lcd_pos(2,0);
+ 307   1          for(i=0;i<16;i++) lcd_wdat(lcd_line3[i]);
+ 308   1          lcd_pos(3,0);
+ 309   1          for(i=0;i<16;i++) lcd_wdat(lcd_line4[i]);
+ 310   1          
+ 311   1          //发送参数至蓝牙
+ 312   1          if(ShowP==1){
+ 313   2            uart_tx_byte('\n');
+ 314   2            uart_tx_byte('T');
+ 315   2            uart_tx_byte(':');  
+ 316   2            for( x=11;x<16;x++)
+ 317   2            {
+ 318   3              uart_tx_byte(lcd_line2[x]);
+ 319   3            } 
+ 320   2            uart_tx_byte('\n');
+ 321   2              for( x=11;x<16;x++)
+ 322   2            {
+ 323   3              uart_tx_byte(lcd_line3[x]);
+ 324   3            } 
+ 325   2            uart_tx_byte('\n');
+ 326   2            uart_tx_byte('P');
+ 327   2            uart_tx_byte(':');
+ 328   2            for( x=7;x<10;x++)
+ 329   2            {
+ 330   3              uart_tx_byte(lcd_line4[x]);
+ 331   3            } 
+ 332   2            ShowP=0;
+ 333   2            
+ 334   2        }
+ 335   1          
+ 336   1      }
+ 337          
+ 338          
+ 339          /***********************************************************
+ 340          *函数名：UART_SER（串口中断服务程序）
+ 341          *功  能：主机根据从机发送的字符指令进行相应判断，若成立则执行相应功能。
+ 342          *输  入：无
+ 343          *输  出：无 
+ 344          ***********************************************************/
+ 345          void UART_SER (void) interrupt 4 //串行中断服务程序
+ 346          {
+ 347   1          unsigned char TEMP;          //定义临时变量 
+ 348   1          //unsigned char q;
+ 349   1          if(RI)                        //判断是接收中断产生
+ 350   1           {
+ 351   2           RI=0;                      //标志位清零
+ 352   2          TEMP=SBUF;                 //读入缓冲区的值
+ 353   2          if(TEMP=='m')
+ 354   2             {
+ 355   3               MODE=!MODE;
+ 356   3               SBUF=MODE;
+ 357   3                while(!TI);      //等待发送数据完成 
+ 358   3           TI=0;
+ 359   3             }
+ 360   2             
+ 361   2         if(TEMP=='k')
+ 362   2             {
+ 363   3               //MotorFlag=1;
+C51 COMPILER V9.60.0.0   MAIN                                                              04/17/2022 15:44:47 PAGE 7   
+
+ 364   3               grad=2;
+ 365   3               SBUF=TEMP;
+ 366   3                while(!TI);      //等待发送数据完成 
+ 367   3           TI=0;
+ 368   3             }
+ 369   2        if(TEMP=='b')
+ 370   2             {
+ 371   3                grad=1;
+ 372   3               SBUF=TEMP;
+ 373   3                while(!TI);      //等待发送数据完成 
+ 374   3           TI=0;
+ 375   3             }
+ 376   2             
+ 377   2         if(TEMP=='s')
+ 378   2             {
+ 379   3               ShowP=1;
+ 380   3               SBUF=TEMP;
+ 381   3                while(!TI);      //等待发送数据完成 
+ 382   3           TI=0;
+ 383   3             }
+ 384   2         if(TEMP=='o')        //正转半圈
+ 385   2             {
+ 386   3               MotorFlag=1; 
+ 387   3                rospeed=60;
+ 388   3               SBUF=TEMP;
+ 389   3                while(!TI);      //等待发送数据完成 
+ 390   3            TI=0;
+ 391   3             }
+ 392   2             
+ 393   2         if(TEMP=='q')
+ 394   2             {
+ 395   3               MotorFlag=2;     //反转半圈
+ 396   3               rospeed=60;
+ 397   3               SBUF=TEMP;
+ 398   3                while(!TI);      //等待发送数据完成 
+ 399   3           TI=0;
+ 400   3             }
+ 401   2          if(SetTime)
+ 402   2          {
+ 403   3          time_buf2[q]=TEMP;//&0x0F
+ 404   3          q++;
+ 405   3          if(q==15)                  //连续接收16个字符信息
+ 406   3           {
+ 407   4            q=0;
+ 408   4          SetFlag=1;               //接收完成标志位置1
+ 409   4          SetTime=0;
+ 410   4           }
+ 411   3            SBUF=time_buf2[q]; //把接收到的值再发回电脑端
+ 412   3            while(!TI);      //等待发送数据完成 
+ 413   3           TI=0;
+ 414   3          }
+ 415   2            if(TEMP=='t')
+ 416   2             {
+ 417   3                SetTime=1;
+ 418   3                SetFlag=1;
+ 419   3               SBUF=TEMP; 
+ 420   3                while(!TI);      //等待发送数据完成 
+ 421   3                TI=0;
+ 422   3             }
+ 423   2          
+ 424   2         }
+ 425   1      
+C51 COMPILER V9.60.0.0   MAIN                                                              04/17/2022 15:44:47 PAGE 8   
+
+ 426   1      }
+ 427          
+ 428          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   2048    ----
+   CONSTANT SIZE    =    141    ----
+   XDATA SIZE       =     45    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     68    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
