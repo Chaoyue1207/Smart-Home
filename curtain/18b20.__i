@@ -1,0 +1,1 @@
+"hardware\temperature\18b20.c" LARGE OPTIMIZE (8,SPEED) BROWSE INCDIR(.\hardware\motor;.\system\delay;.\hardware\temperature;.\hardware\lumination;.\hardware\usart;.\hardware\display_lcd12864;.\hardware\display_lcd1602;.\system\control;.\system\iic;.\system\timer;.\hardware\clock) DEBUG OBJECTEXTEND PRINT(.\18b20.lst) TABS (2) OBJECT(18b20.obj)

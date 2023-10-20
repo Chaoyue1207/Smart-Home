@@ -1,0 +1,102 @@
+C51 COMPILER V9.60.0.0   18B20                                                             04/17/2022 15:44:51 PAGE 1   
+
+
+C51 COMPILER V9.60.0.0, COMPILATION OF MODULE 18B20
+OBJECT MODULE PLACED IN 18b20.obj
+COMPILER INVOKED BY: D:\Keil_v5\C51\BIN\C51.EXE hardware\temperature\18b20.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(.\har
+                    -dware\motor;.\system\delay;.\hardware\temperature;.\hardware\lumination;.\hardware\usart;.\hardware\display_lcd12864;.\h
+                    -ardware\display_lcd1602;.\system\control;.\system\iic;.\system\timer;.\hardware\clock) DEBUG OBJECTEXTEND PRINT(.\18b20.
+                    -lst) TABS(2) OBJECT(18b20.obj)
+
+line level    source
+
+   1          #include "main.h"
+   2          //#include"18b20.h"
+   3          //DS18B20延时函数
+   4          void delay(unsigned int i)
+   5          {
+   6   1        while(i--);
+   7   1      }
+   8          
+   9          //DS18B20初始化函数
+  10          Init_DS18B20(void)
+  11          {
+  12   1        unsigned char x=0;
+  13   1        DQ = 1; //DQ复位
+  14   1        delay(8); //稍做延时
+  15   1        DQ = 0; //单片机将DQ拉低
+  16   1        delay(80); //精确延时 大于 480us
+  17   1        DQ = 1; //拉高总线
+  18   1        delay(14);
+  19   1        x=DQ; //稍做延时后 如果x=0则初始化成功 x=1则初始化失败
+  20   1        delay(20);
+  21   1      }
+  22          
+  23          //DS18B20读一个字节
+  24          ReadOneChar(void)
+  25          {
+  26   1        unsigned char i=0;
+  27   1        unsigned char dat = 0;
+  28   1        for (i=8;i>0;i--){
+  29   2          DQ = 0; // 给脉冲信号
+  30   2          dat>>=1;
+  31   2          DQ = 1; // 给脉冲信号
+  32   2          if(DQ)  dat|=0x80;
+  33   2          delay(4);
+  34   2          }
+  35   1        return(dat);
+  36   1      }
+  37          
+  38          //DS18B20写一个字节
+  39          WriteOneChar(unsigned char dat)
+  40          {
+  41   1        unsigned char i=0;
+  42   1        for (i=8; i>0; i--){
+  43   2          DQ = 0;
+  44   2          DQ = dat&0x01;
+  45   2          delay(5);
+  46   2          DQ = 1;
+  47   2          dat>>=1;
+  48   2          }
+  49   1      }
+  50          
+  51          //DS18B20读取温度
+  52          ReadTemperature(void)
+C51 COMPILER V9.60.0.0   18B20                                                             04/17/2022 15:44:51 PAGE 2   
+
+  53          {
+  54   1        unsigned char a=0;
+  55   1        unsigned char b=0;
+  56   1        unsigned int t=0;
+  57   1        float tt=0;
+  58   1        Init_DS18B20();
+  59   1        WriteOneChar(0xCC); // 跳过读序号列号的操作
+  60   1        WriteOneChar(0x44); // 启动温度转换
+  61   1        Init_DS18B20();
+  62   1        WriteOneChar(0xCC); //跳过读序号列号的操作
+  63   1        WriteOneChar(0xBE); //读取温度寄存器等（共可读9个寄存器） 前两个就是温度
+  64   1        a=ReadOneChar();
+  65   1        b=ReadOneChar();
+  66   1        t=b;
+  67   1        t<<=8;
+  68   1        t=t|a;
+  69   1        tt=t*0.0625; //将温度的高位与低位合并
+  70   1        t= tt*10+0.5; //对结果进行4舍5入
+  71   1        return(t);
+  72   1      }
+*** WARNING C290 IN LINE 21 OF hardware\temperature\18b20.c: missing return value
+*** WARNING C290 IN LINE 49 OF hardware\temperature\18b20.c: missing return value
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    241    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----       4
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  2 WARNING(S),  0 ERROR(S)

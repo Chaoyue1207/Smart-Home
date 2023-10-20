@@ -1,0 +1,46 @@
+C51 COMPILER V9.60.0.0   TIM0                                                              04/17/2022 15:44:51 PAGE 1   
+
+
+C51 COMPILER V9.60.0.0, COMPILATION OF MODULE TIM0
+OBJECT MODULE PLACED IN Tim0.obj
+COMPILER INVOKED BY: D:\Keil_v5\C51\BIN\C51.EXE system\timer\Tim0.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(.\hardware\mot
+                    -or;.\system\delay;.\hardware\temperature;.\hardware\lumination;.\hardware\usart;.\hardware\display_lcd12864;.\hardware\d
+                    -isplay_lcd1602;.\system\control;.\system\iic;.\system\timer;.\hardware\clock) DEBUG OBJECTEXTEND PRINT(.\Tim0.lst) TABS(
+                    -2) OBJECT(Tim0.obj)
+
+line level    source
+
+   1          #include "reg52.h"
+   2          #include "main.h"
+   3          
+   4          
+   5          
+   6          
+   7          void Timer0Init()
+   8          {
+   9   1        TMOD|=0X01;//选择为定时器0模式，工作方式1，仅用TR0打开启动。
+  10   1      
+  11   1        TH0=0XFF; //给定时器赋初值，定时100us
+  12   1        TL0=0X9C; 
+  13   1        ET0=1;//打开定时器0中断允许
+  14   1        EA=1;//打开总中断
+  15   1        TR0=1;//打开定时器      
+  16   1      }
+  17          
+  18          
+  19          
+  20          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =     16    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
